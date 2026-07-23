@@ -24,8 +24,10 @@ from unittest import mock
 
 from absl.testing import absltest
 import omegaconf
+from tunix.cli import base_rl_pipeline
 from tunix.cli import grpo_main
 from tunix.rl import rl_cluster as rl_cluster_lib
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -410,7 +412,7 @@ verl_compatible: false
     pipeline = _make_pipeline(extra)
     self.assertEqual(pipeline.config.get("training_mode", "grpo"), "grpo")
     with mock.patch.object(pipeline, "_run") as mock_run:
-      pipeline.run_grpo_trainer()
+      pipeline.run_trainer()
       mock_run.assert_called_once_with(mode="grpo")
 
   def test_agentic_grpo_dispatches_to_agentic(self):
@@ -450,7 +452,7 @@ vllm_config:
     pipeline = _make_pipeline(extra)
     self.assertEqual(pipeline.config["training_mode"], "agentic_grpo")
     with mock.patch.object(pipeline, "_run") as mock_run:
-      pipeline.run_grpo_trainer()
+      pipeline.run_trainer()
       mock_run.assert_called_once_with(mode="agentic_grpo")
 
   def test_unknown_mode_raises(self):
@@ -499,7 +501,7 @@ verl_compatible: false
                   with self.assertRaisesRegex(
                       ValueError, "Unsupported training_mode 'bad_mode'"
                   ):
-                    pipeline.run_grpo_trainer()
+                    pipeline.run_trainer()
 
 
 # ---------------------------------------------------------------------------
@@ -731,9 +733,11 @@ vllm_config:
         self.axis_names = axis_names
         self.axis_types = axis_types
 
-    with mock.patch.object(grpo_main.jax, "devices", return_value=fake_devices):
+    with mock.patch.object(
+        base_rl_pipeline.jax, "devices", return_value=fake_devices
+        ):
       with mock.patch.object(
-          grpo_main.jax.sharding, "Mesh", side_effect=FakeMesh
+          base_rl_pipeline.jax.sharding, "Mesh", side_effect=FakeMesh
       ):
         role_to_mesh = pipeline.create_role_to_mesh()
 
@@ -817,16 +821,18 @@ vllm_config:
 
     fake_devices = list(range(4))
 
-    with mock.patch.object(grpo_main.jax, "devices", return_value=fake_devices):
+    with mock.patch.object(
+        base_rl_pipeline.jax, "devices", return_value=fake_devices
+        ):
       with mock.patch.object(
-          grpo_main.mesh_lib,
+          base_rl_pipeline.mesh_lib,
           "allocate_named_mesh_device_slices",
           return_value={
               "actor_model_config": [0, 1],
               "rollout_model_config": [2, 3],
           },
       ) as allocate_mock, mock.patch.object(
-          grpo_main.mesh_lib,
+          base_rl_pipeline.mesh_lib,
           "create_mesh",
           side_effect=[object(), object()],
       ):
